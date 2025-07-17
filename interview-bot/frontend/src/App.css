@@ -1,0 +1,161 @@
+body {
+  background-color: #282c34;
+  color: white;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.App {
+  text-align: center;
+}
+
+.App-header {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.messages-container {
+  width: 100%;
+  max-width: 800px;
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid #444;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.message {
+  max-width: 70%;
+  padding: 10px 15px;
+  border-radius: 18px;
+  margin-bottom: 10px;
+  text-align: left;
+}
+
+.message.bot {
+  background-color: #3a3f47;
+  align-self: flex-start;
+}
+
+.message.user {
+  background-color: #007bff;
+  align-self: flex-end;
+}
+
+.controls {
+  padding: 20px;
+  width: 100%;
+}
+
+.controls button {
+  background-color: #61dafb;
+  border: none;
+  padding: 15px 30px;
+  border-radius: 50px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  color: #282c34;
+}
+
+.controls button:disabled {
+  background-color: #4a5260;
+  cursor: not-allowed;
+  color: #999;
+}
+
+.controls button.recording {
+  background-color: #ff4136;
+  transform: scale(1.1);
+}
+
+.status-text {
+  margin-top: 15px;
+  height: 20px;
+  font-style: italic;
+  color: #ccc;
+}
+
+/* --- NEW AND UPDATED STYLES START HERE --- */
+
+/* Styling for the new header bar to hold the title and timer */
+.header-bar {
+  width: 100%;
+  max-width: 800px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+/* Styling for the timer */
+.timer {
+  font-size: 1.2rem;
+  font-weight: bold;
+  background-color: #444;
+  padding: 8px 16px;
+  border-radius: 20px;
+}
+
+.controls .end-button {
+  background-color: #dc3545; /* A standard "danger" red color */
+  color: #fff;
+}
+
+.controls .end-button:hover {
+  background-color: #c82333; /* A slightly darker red for hover effect */
+}
+
+/* A wrapper for the two buttons to align them nicely */
+.button-group {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px; /* Adds space between the buttons */
+}
+
+/* Styling for the new feedback box */
+.message.feedback {
+  background-color: #1a2530; /* A different, slightly darker color */
+  border: 1px solid #61dafb; /* Highlight with the theme color */
+  align-self: center; /* Center the feedback box */
+  max-width: 90%; /* Allow it to be wider */
+  margin-top: 20px;
+}
+
+.message.feedback h3 {
+  margin-top: 0;
+  color: #61dafb;
+}
+
+/* Make sure paragraphs inside the feedback box wrap correctly */
+.message.feedback p {
+  white-space: pre-wrap; /* This preserves newlines from the AI's response */
+}
+
+/* Styling for the new welcome page box */
+.welcome-box {
+  background-color: #3a3f47;
+  padding: 20px 40px;
+  border-radius: 12px;
+  max-width: 600px;
+  text-align: center;
+  margin-bottom: 30px;
+  border: 1px solid #444;
+}
+
+.welcome-box p {
+  line-height: 1.6;
+}
