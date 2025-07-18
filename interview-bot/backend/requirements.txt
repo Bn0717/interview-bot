@@ -1,6 +1,9 @@
+# backend/requirements.txt
 fastapi
-uvicorn
+uvicorn[standard]
 openai
 whisperx
-piper-tts
 python-dotenv
+torch
+torchaudio
+python-multipart
