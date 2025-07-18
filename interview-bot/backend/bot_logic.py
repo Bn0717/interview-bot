@@ -13,19 +13,34 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 AI_MODEL = "gpt-3.5-turbo"
 
 # --- Model Configuration ---
-WHISPER_MODEL = "base"
-# On Render's CPU instances, this will correctly default to "cpu" and "int8"
+WHISPER_MODEL_NAME = "base"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 COMPUTE_TYPE = "float16" if torch.cuda.is_available() else "int8"
 
 # --- PATHS FOR RENDER DEPLOYMENT ---
-# These paths MUST match the files downloaded by the build.sh script.
-
-# The build.sh script downloads the Piper executable into a 'piper' subdirectory.
 PIPER_EXECUTABLE_PATH = './piper/piper' 
-
-# The build.sh script downloads the voice model to the root of the backend directory.
 VOICE_MODEL_PATH = 'en_US-hfc_female-medium.onnx'
+
+# --- LAZY LOADING IMPLEMENTATION ---
+# We start with the model as None. It will be loaded only when needed.
+whisper_model = None
+
+def load_whisper_model_if_needed():
+    """
+    This function checks if the WhisperX model is loaded.
+    If not, it loads it into memory. This happens only once.
+    """
+    global whisper_model
+    if whisper_model is None:
+        print("WhisperX model is not loaded. Loading now... (This may take a moment)")
+        try:
+            whisper_model = whisperx.load_model(WHISPER_MODEL_NAME, DEVICE, compute_type=COMPUTE_TYPE)
+            print("WhisperX model loaded successfully.")
+        except Exception as e:
+            print(f"FATAL: Could not load WhisperX model. Error: {e}")
+            # If the model fails to load, we should raise an exception
+            # to prevent the app from running in a broken state.
+            raise e
 
 # --- System Prompt for the AI ---
 system_prompt = (
@@ -37,36 +52,22 @@ system_prompt = (
 )
 
 
-# --- Initialize Models on Startup ---
-# This code runs only once when the server starts, which is efficient.
-print("Loading WhisperX model...")
-try:
-    whisper_model = whisperx.load_model(WHISPER_MODEL, DEVICE, compute_type=COMPUTE_TYPE)
-    print("WhisperX model loaded successfully.")
-except Exception as e:
-    print(f"FATAL: Could not load WhisperX model. Error: {e}")
-
-print(f"Piper TTS voice model '{VOICE_MODEL_PATH}' is ready to be used via command line.")
-if not os.path.exists(PIPER_EXECUTABLE_PATH):
-    print(f"WARNING: Piper executable not found at '{PIPER_EXECUTABLE_PATH}'. The build.sh script may not have run correctly.")
-if not os.path.exists(VOICE_MODEL_PATH):
-    print(f"WARNING: Piper voice model not found at '{VOICE_MODEL_PATH}'. The build.sh script may not have run correctly.")
-
-
 # --- Core Logic Functions ---
 
 def transcribe_audio_with_whisperx(audio_path: str) -> str:
     """
-    Transcribes the given audio file using the pre-loaded WhisperX model.
+    Transcribes the given audio file using the WhisperX model.
+    It will trigger the model to load on the very first call.
     """
+    # This is the key change: ensure the model is loaded before using it.
+    load_whisper_model_if_needed()
+
     print(f"Transcribing audio from: {audio_path}")
     try:
         audio = whisperx.load_audio(audio_path)
         result = whisper_model.transcribe(audio, batch_size=4, language="en")
-        # Joining text segments to form the full transcription
         transcribed_text = " ".join([segment.get('text', '') for segment in result.get('segments', [])])
         
-        # Simple filter for common junk transcriptions from silence or background noise
         if transcribed_text.lower().strip() in ["you", "thank you.", "thanks for watching."]:
             return ""
             
@@ -74,64 +75,33 @@ def transcribe_audio_with_whisperx(audio_path: str) -> str:
         return transcribed_text.strip()
     except Exception as e:
         print(f"Error during transcription: {e}")
-        return "" # Return empty string on error
+        return ""
 
 
 def generate_audio_via_cmd(text: str, output_path_mp3: str) -> str:
     """
     Generates speech audio by piping the Piper executable's raw output to FFmpeg for MP3 conversion.
-    This method is robust and works well in containerized environments like Render.
     """
     print(f"Generating audio for text: '{text[:50]}...'")
     
-    # Command to run the Piper executable
-    piper_command = [
-        PIPER_EXECUTABLE_PATH,
-        '--model', VOICE_MODEL_PATH,
-        '--output-raw'  # Output raw audio data to stdout
-    ]
-
-    # Command to run FFmpeg, taking raw audio from stdin
-    ffmpeg_command = [
-        'ffmpeg',
-        '-f', 's16le',      # Input format: 16-bit signed little-endian PCM
-        '-ar', '22050',     # Input sample rate (must match the Piper model)
-        '-ac', '1',         # Input audio channels (mono)
-        '-i', 'pipe:0',     # Input from stdin (the pipe)
-        '-y',               # Overwrite output file if it exists
-        '-q:a', '0',        # Use VBR for high-quality MP3 encoding
-        output_path_mp3
-    ]
+    piper_command = [PIPER_EXECUTABLE_PATH, '--model', VOICE_MODEL_PATH, '--output-raw']
+    ffmpeg_command = ['ffmpeg', '-f', 's16le', '-ar', '22050', '-ac', '1', '-i', 'pipe:0', '-y', '-q:a', '0', output_path_mp3]
 
     try:
-        # Start the Piper process
         piper_process = subprocess.Popen(piper_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        
-        # Start the FFmpeg process, piping Piper's output to its input
         ffmpeg_process = subprocess.Popen(ffmpeg_command, stdin=piper_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        # Pass the text to Piper's stdin and close it to signal end of input.
-        # This is more robust than separate wait calls. It writes data and waits for completion.
         piper_process.stdin.write(text.encode('utf-8'))
         piper_process.stdin.close()
-
-        # Wait for FFmpeg to finish and capture any error output
         _, ffmpeg_err = ffmpeg_process.communicate()
 
-        # Check if FFmpeg encountered an error
         if ffmpeg_process.returncode != 0:
-            print("!!!!!! FFMPEG COMMAND FAILED !!!!!!")
-            print(f"FFmpeg stderr: {ffmpeg_err.decode()}")
-            # It's also helpful to see if Piper had an error
-            _, piper_err = piper_process.communicate()
-            print(f"Piper stderr: {piper_err.decode()}")
+            print(f"!!!!!! FFMPEG COMMAND FAILED !!!!!!\nFFmpeg stderr: {ffmpeg_err.decode()}")
             raise Exception("FFmpeg failed to convert audio.")
         else:
             print(f"Successfully generated audio at: {output_path_mp3}")
 
     except FileNotFoundError:
-        print("FATAL ERROR: 'ffmpeg' or 'piper' executable not found.")
-        print(f"Ensure '{PIPER_EXECUTABLE_PATH}' exists and 'ffmpeg' is installed via build.sh.")
+        print(f"FATAL ERROR: 'ffmpeg' or 'piper' executable not found. Ensure '{PIPER_EXECUTABLE_PATH}' exists.")
         raise
     except Exception as e:
         print(f"An unexpected error occurred during audio generation: {e}")
