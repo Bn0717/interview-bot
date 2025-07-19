@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';;
 const SILENT_AUDIO = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
 
 function App() {
